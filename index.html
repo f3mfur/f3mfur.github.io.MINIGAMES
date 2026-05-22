@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bumblebee Autobot Arcade</title>
+    <style>
+        :root { --bg: #f0f0f0; --text: #333; --panel: #fff; --btn: #ffcc00; --btn-txt: #000; --bee: #ffcc00; }
+        [data-theme="dark"] { --bg: #1a1a1a; --text: #f0f0f0; --panel: #2d2d2d; --btn: #e6b800; --btn-txt: #1a1a1a; }
+        [data-theme="pink"] { --bg: #fff0f5; --text: #4a0022; --panel: #ffe4e1; --btn: #ff69b4; --btn-txt: #fff; --bee: #ff69b4; }
+        body { margin: 0; padding: 0; font-family: sans-serif; background: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        .screen { display: none; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; }
+        .active { display: flex; }
+        button { padding: 12px 30px; font-size: 1.1rem; font-weight: bold; margin: 8px; cursor: pointer; border: none; border-radius: 8px; background: var(--btn); color: var(--btn-txt); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        button:hover { transform: scale(1.03); }
+        .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; max-width: 600px; margin-top: 15px; }
+        .game-container { background: var(--panel); padding: 15px; border-radius: 12px; box-shadow: 0 8px 16px rgba(0,0,0,0.2); text-align: center; }
+        canvas { background: #111; display: block; border-radius: 6px; }
+        .hud { display: flex; justify-content: space-between; width: 100%; font-size: 1.1rem; margin-bottom: 8px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <!-- MAIN MENU -->
+    <div id="main-menu" class="screen active">
+        <h1>🐝 BUMBLEBEE ARCADE 🐝</h1>
+        <button onclick="goScreen('hub-screen')">START</button>
+        <button id="theme-btn" onclick="cycleTheme()">THEME: LIGHT</button>
+    </div>
+
+    <!-- HUB -->
+    <div id="hub-screen" class="screen">
+        <h2>SELECT A MINIGAME</h2>
+        <div class="grid">
+            <button onclick="startGame(1)">1. Snake</button>
+            <button onclick="startGame(2)">2. Platform Jump</button>
+            <button onclick="startGame(3)">3. Garage Stealth</button>
+            <button onclick="startGame(4)">4. Decepticon Dodge</button>
+            <button onclick="startGame(5)">5. Energon Catch</button>
+            <button onclick="startGame(6)">6. Cyber Grid</button>
+            <button onclick="startGame(7)">7. Meteor Defender</button>
+            <button onclick="startGame(8)">8. Laser Maze</button>
+            <button onclick="startGame(9)">9. Speed Highway</button>
+        </div>
+        <button onclick="goScreen('main-menu')" style="margin-top:20px; background:#888; color:#fff;">BACK</button>
+    </div>
+
+    <!-- PLAY ZONE -->
+    <div id="game-screen" class="screen">
+        <div class="game-container">
+            <div class="hud"><span id="g-title">Game</span><span id="g-score">Score: 0</span></div>
+            <canvas id="canvas" width="480" height="480"></canvas>
+            <button onclick="exitGame()" style="margin-top:12px; padding:8px 16px; font-size:0.9rem;">QUIT TO HUB</button>
+        </div>
+    </div>
+
+    <script>
+        const cvs = document.getElementById('canvas');
+        const ctx = cvs.getContext('2d');
+        let theme = 'light', activeG = 0, loop = null, score = 0, keys = {}, gState = {};
+
+        function goScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+        
+        function cycleTheme() {
+            const b = document.getElementById('theme-btn');
+            if (theme === 'light') { theme = 'dark'; document.documentElement.setAttribute('data-theme', 'dark'); b.innerText = "THEME: DARK"; }
+            else if (theme === 'dark') { theme = 'pink'; document.documentElement.setAttribute('data-theme', 'pink'); b.innerText = "THEME: PINK/GIRLY"; }
+            else { theme = 'light'; document.documentElement.removeAttribute('data-theme'); b.innerText = "THEME: LIGHT"; }
+        }
+
+        window.addEventListener('keydown', e => { keys[e.code] = true; if(["Space","ArrowUp","ArrowDown"].includes(e.code)) e.preventDefault(); });
+        window.addEventListener('keyup', e => { keys[e.code] = false; });
+
+        function drawBee(x, y, size, isCar = false) {
+            let c = getComputedStyle(document.documentElement).getPropertyValue('--btn').trim() || '#ffcc00';
+            ctx.fillStyle = c;
+            if (isCar) {
+                ctx.fillRect(x, y + size/4, size, size/2);
+                ctx.fillStyle = '#222';
+                ctx.fillRect(x+4, y+size/1.5, size/4, size/5);
+                ctx.fillRect(x+size-12, y+size/1.5, size/4, size/5);
+            } else {
+                ctx.fillRect(x + size/4, y + size/4, size/2, size/2);
+                ctx.fillStyle = '#222'; ctx.fillRect(x + size/3, y, size/3, size/4);
+                ctx.fillStyle = '#00e5ff'; ctx.fillRect(x + size/2.5, y + 2, 4, 3);
+            }
+        }
+
+        function exitGame() { clearInterval(loop); activeG = 0; goScreen('hub-screen'); }
+        function setScore(v) { score = v; document.getElementById('g-score').innerText = "Score: " + score; }
+
+        function startGame(num) {
+            activeG = num; setScore(0); keys = {}; gState = {}; goScreen('game-screen'); clearInterval(loop);
+            const titles = ["", "Snake Control", "Cloud Ascent", "Garage Disguise", "Decepticon Dodge", "Energon Catch", "Cyber Grid", "Meteor Defender", "Laser Maze", "Speed Highway"];
+            document.getElementById('g-title').innerText = titles[num];
+            
+            if(num===1) initG1(); else if(num===2) initG2(); else if(num===3) initG3();
+            else if(num===4) initG4(); else if(num===5) initG5(); else if(num===6) initG6();
+            else if(num===7) initG7(); else if(num===8) initG8(); else if(num===9) initG9();
+        }
+
+        // 1. SNAKE
+        function initG1() {
+            gState = { sn: [{x:240,y:240}], d: 'R', f: {x:80,y:80} };
+            loop = setInterval(() => {
+                let s = gState;
+                if (keys['ArrowUp'] && s.d!=='D') s.d='U'; if (keys['ArrowDown'] && s.d!=='U') s.d='D';
+                if (keys['ArrowLeft'] && s.d!=='R') s.d='L'; if (keys['ArrowRight'] && s.d!=='L') s.d='R';
+                let h = Object.assign({}, s.sn[0]);
+                if(s.d==='U') h.y-=20; if(s.d==='D') h.y+=20; if(s.d==='L') h.x-=20; if(s.d==='R') h.x+=20;
+                if(h.x<0||h.x>=480||h.y<0||h.y>=480) return startGame(1);
+                s.sn.unshift(h);
+                if(h.x===s.f.x && h.y===s.f.y) { setScore(score+100); s.f={x:Math.floor(Math.random()*24)*20, y:Math.floor(Math.random()*24)*20}; } else { s.sn.pop(); }
+                ctx.clearRect(0,0,480,480); ctx.fillStyle='#ff3366'; ctx.fillRect(s.f.x, s.f.y, 20, 20);
+                s.sn.forEach((pt,i)=>drawBee(pt.x,pt.y,20,i>0));
+            }, 100);
+        }
+
+        // 2. PLATFORM JUMP
+        function initG2() {
+            gState = { px:240, py:300, vy:0, cam:0, plats: [{x:200,y:400,t:'n',w:80}] };
+            for(let i=0;i<15;i++) gState.plats.push({x:Math.random()*400, y:340-(i*55), t:Math.random()<0.25?'s':(Math.random()<0.3?'b':'n'), w:80, tm:0});
+            loop = setInterval(() => {
+                let s = gState;
+                if(score>=50000){ ctx.fillStyle='#fff'; ctx.font='20px sans-serif'; ctx.fillText("Reached Cloud! Zzz...",140,240); clearInterval(loop); return; }
+                if(keys['ArrowLeft']) s.px-=4; if(keys['ArrowRight']) s.px+=4;
+                s.vy+=0.35; s.py+=s.vy;
+                if(s.px<0) s.px=480; if(s.px>480) s.px=0;
+                if(s.py < 200+s.cam) { let diff=(200+s.cam)-s.py; s.cam-=diff; setScore(score+Math.floor(diff*12)); }
+                ctx.clearRect(0,0,480,480); ctx.save(); ctx.translate(0, -s.cam);
+                s.plats.forEach((p,i)=>{
+                    ctx.fillStyle=p.t==='n'?'#8bc34a':(p.t==='s'?'#00e5ff':'#ff5722');
+                    ctx.fillRect(p.x,p.y,p.w,12);
+                    if(s.vy>0 && s.py+24>=p.y && s.py+22<=p.y+12 && s.px+24>=p.x && s.px<=p.x+p.w) {
+                        if(p.t==='s') s.vy=-16; else if(p.t==='b') { p.tm+=1; if(p.tm>15) s.plats.splice(i,1); s.vy=-8; } else s.vy=-9;
+                    }
+                });
+                if(s.plats[s.plats.length-1].y > s.cam-100) s.plats.push({x:Math.random()*400, y:s.plats[s.plats.length-1].y-55, t:Math.random()<0.2?'s':(Math.random()<0.25?'b':'n'), w:80, tm:0});
+                drawBee(s.px, s.py, 24, s.vy<0); ctx.restore();
+                if(s.py > s.cam+480) startGame(2);
+            }, 1000/60);
+        }
+
+        // 3. GARAGE STEALTH
+        function initG3() {
+            gState = { open:false, timer:60, mode:'B' };
+            loop = setInterval(() => {
+                let s = gState; s.mode = keys['Space'] ? 'C' : 'B'; s.timer--;
+                if(s.timer<=0) { s.open=!s.open; s.timer=s.open?60+Math.random()*40:100+Math.random()*60; }
+                if(s.open && s.mode==='B') setScore(Math.max(0,score-8)); else if(!s.open && s.mode==='B') setScore(score+4);
+                ctx.clearRect(0,0,480,480); ctx.fillStyle='#333'; ctx.fillRect(40,100,400,280);
+                if(!s.open) { ctx.fillStyle='#888'; ctx.fillRect(50,110,380,260); }
+                drawBee(220, 280, 45, s.mode==='C');
+                ctx.fillStyle='#999'; ctx.font='14px sans-serif'; ctx.fillText("Hold SPACE to be a car! Hide when door opens!",80,440);
+            }, 1000/60);
+        }
+
+        // 4. DECEPTICON DODGE
+        function initG4() {
+            gState = { x:220, obs:[] };
+            loop = setInterval(() => {
+                let s = gState; if(keys['ArrowLeft']) s.x-=5; if(keys['ArrowRight']) s.x+=5;
+                if(Math.random()<0.06) s.obs.push({x:Math.random()*440, y:0, w:30, h:30});
+.ctx.clearRect(0,0,480,480); drawBee(s.x, 400, 32, false);s.obs.forEach((o,i)=>{o.y+=5; ctx.fillStyle='#ff3333'; ctx.fillRect(o.x,o.y,o.w,o.h);if(o.y>480) { s.obs.splice(i,1); setScore(score+50); }if(o.y+o.h>=400 && o.y<=432 && o.x+o.w>=s.x && o.x<=s.x+32) startGame(4);});}, 1000/60);}// 5. ENERGON CATCHfunction initG5() {gState = { x:220, items:[] };loop = setInterval(() => {let s = gState; if(keys['ArrowLeft']) s.x-=6; if(keys['ArrowRight']) s.x+=6;if(Math.random()<0.04) s.items.push({x:Math.random()*450, y:0});ctx.clearRect(0,0,480,480); drawBee(s.x, 420, 30, true);s.items.forEach((m,i)=>{m.y+=4; ctx.fillStyle='#00e5ff'; ctx.fillRect(m.x,m.y,15,15);if(m.y>480) s.items.splice(i,1);if(m.y+15>=420 && m.y<=450 && m.x+15>=s.x && m.x<=s.x+30) { s.items.splice(i,1); setScore(score+100); }});}, 1000/60);}// 6. CYBER GRIDfunction initG6() {gState = { x:220, y:220, tx:220, ty:220 };loop = setInterval(() => {let s = gState;if(Math.abs(s.x-s.tx)<2 && Math.abs(s.y-s.ty)<2) {setScore(score+10); s.tx=Math.floor(Math.random()*14+1)*30; s.ty=Math.floor(Math.random()*14+1)*30;}if(keys['ArrowLeft']) s.x-=4; if(keys['ArrowRight']) s.x+=4;if(keys['ArrowUp']) s.y-=4; if(keys['ArrowDown']) s.y+=4;ctx.clearRect(0,0,480,480); ctx.fillStyle='#ffcc00'; ctx.fillRect(s.tx,s.ty,20,20);drawBee(s.x, s.y, 28, false);}, 1000/60);}// 7. METEOR DEFENDERfunction initG7() {gState = { x:220, laser:null, met:{x:Math.random()*440, y:0} };loop = setInterval(() => {let s = gState; if(keys['ArrowLeft']) s.x-=5; if(keys['ArrowRight']) s.x+=5;if(keys['Space'] && !s.laser) s.laser = {x:s.x+12, y:400};s.met.y+=3; if(s.met.y>480) startGame(7);ctx.clearRect(0,0,480,480); ctx.fillStyle='#ffaa00'; ctx.fillRect(s.met.x, s.met.y, 25, 25);if(s.laser) {s.laser.y-=8; ctx.fillStyle='#00ffff'; ctx.fillRect(s.laser.x, s.laser.y, 4, 15);if(s.laser.y<0) s.laser=null;else if(s.laser.y<=s.met.y+25 && s.laser.x>=s.met.x && s.laser.x<=s.met.x+25) {s.laser=null; s.met={x:Math.random()*440, y:0}; setScore(score+250);}}drawBee(s.x, 410, 28, false);}, 1000/60);}// 8. LASER MAZEfunction initG8() {gState = { x:20, y:220, lOn:true, timer:0 };loop = setInterval(() => {let s = gState; s.timer++; if(s.timer%40===0) s.lOn=!s.lOn;if(keys['ArrowRight']) s.x+=3; if(keys['ArrowLeft']) s.x-=3;if(s.x>450) { s.x=20; setScore(score+500); }ctx.clearRect(0,0,480,480);if(s.lOn) {ctx.fillStyle='#ff0055'; ctx.fillRect(160,0,15,480); ctx.fillRect(320,0,15,480);if((s.x+24>=160 && s.x<=175) || (s.x+24>=320 && s.x<=335)) startGame(8);}drawBee(s.x, s.y, 26, true);}, 1000/60);}// 9. SPEED HIGHWAYfunction initG9() {gState = { y:220, cars:[{x:480, y:150, s:4}, {x:600, y:280, s:6}] };loop = setInterval(() => {let s = gState; if(keys['ArrowUp']) s.y-=4; if(keys['ArrowDown']) s.y+=4;if(s.y<0) s.y=0; if(s.y>440) s.y=440;setScore(score+1); ctx.clearRect(0,0,480,480);s.cars.forEach(c=>{c.x-=c.s; if(c.x<-60) { c.x=520; c.y=100+Math.random()*260; c.s=4+Math.random()*4; }ctx.fillStyle='#9c27b0'; ctx.fillRect(c.x, c.y, 50, 25);if(c.x<=54 && c.x+50>=20 && c.y<=s.y+24 && c.y+25>=s.y) startGame(9);});drawBee(20, s.y, 26, true);}, 1000/60);}
